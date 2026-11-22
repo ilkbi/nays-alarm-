@@ -1,0 +1,50 @@
+name: Nays Restock-Alarm
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # alle 5 Minuten prüfen
+    - cron: "0 8 * * *"     # täglich ~9 Uhr: Lebenszeichen
+  workflow_dispatch:        # manueller Test
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Lagerstatus prüfen
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          python3 - <<'EOF'
+          import json, os, urllib.request
+          TOPIC = os.environ["NTFY_TOPIC"]
+          SHOP = "https://naysbaits.com/products/nays-adventskalender-2026?variant=56911610413391"
+          API = "https://naysbaits.com/products/nays-adventskalender-2026.js"
+
+          def push(text, prio, tag):
+              req = urllib.request.Request(
+                  f"https://ntfy.sh/{TOPIC}", data=text.encode("utf-8"), method="POST",
+                  headers={"Title": "Nays Adventskalender", "Priority": prio,
+                           "Tags": tag, "Click": SHOP})
+              urllib.request.urlopen(req, timeout=20).read()
+
+          try:
+              req = urllib.request.Request(API, headers={"User-Agent": "Mozilla/5.0"})
+              data = json.load(urllib.request.urlopen(req, timeout=20))
+          except Exception as e:
+              print("Shop nicht erreichbar:", e)
+              raise SystemExit(0)
+
+          available = bool(data.get("available")) or any(
+              v.get("available") for v in data.get("variants", []))
+          print("VERFUEGBAR" if available else "ausverkauft")
+
+          if available:
+              push("JETZT VERFÜGBAR! Tippen zum Kaufen.", "urgent", "rotating_light")
+          elif os.environ.get("EVENT") == "workflow_dispatch":
+              push("Test erfolgreich: Bot läuft. Noch ausverkauft.", "default", "white_check_mark")
+          elif os.environ.get("SCHEDULE") == "0 8 * * *":
+              push("Bot läuft – Kalender noch ausverkauft.", "low", "hourglass")
+          EOF
