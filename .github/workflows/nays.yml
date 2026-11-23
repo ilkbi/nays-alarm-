@@ -1,9 +1,8 @@
 name: Nays Restock-Alarm
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"   # alle 5 Minuten prüfen
-    - cron: "0 8 * * *"     # täglich ~9 Uhr: Lebenszeichen
+  repository_dispatch:
+    types: [check]          # wird alle 5 Min von cron-job.org ausgelöst
   workflow_dispatch:        # manueller Test
 
 jobs:
@@ -15,10 +14,10 @@ jobs:
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           EVENT: ${{ github.event_name }}
-          SCHEDULE: ${{ github.event.schedule }}
         run: |
           python3 - <<'EOF'
           import json, os, urllib.request
+          from datetime import datetime, timezone
           TOPIC = os.environ["NTFY_TOPIC"]
           SHOP = "https://naysbaits.com/products/nays-adventskalender-2026?variant=56911610413391"
           API = "https://naysbaits.com/products/nays-adventskalender-2026.js"
@@ -40,11 +39,12 @@ jobs:
           available = bool(data.get("available")) or any(
               v.get("available") for v in data.get("variants", []))
           print("VERFUEGBAR" if available else "ausverkauft")
+          now = datetime.now(timezone.utc)
 
           if available:
               push("JETZT VERFÜGBAR! Tippen zum Kaufen.", "urgent", "rotating_light")
           elif os.environ.get("EVENT") == "workflow_dispatch":
               push("Test erfolgreich: Bot läuft. Noch ausverkauft.", "default", "white_check_mark")
-          elif os.environ.get("SCHEDULE") == "0 8 * * *":
-              push("Bot läuft – Kalender noch ausverkauft.", "low", "hourglass")
+          elif now.hour == 8 and now.minute < 5:  # ca. 9:00 Uhr deutscher Zeit
+              push("Bot läuft – Kalender noch ausverkauft.", "default", "hourglass")
           EOF
