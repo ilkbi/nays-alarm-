@@ -1,0 +1,34 @@
+name: Alarm-Test (verfuegbares Produkt)
+
+on:
+  workflow_dispatch:        # nur manuell starten
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Alarm mit verfuegbarem Produkt testen
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          python3 - <<'EOF'
+          import json, os, urllib.request
+          TOPIC = os.environ["NTFY_TOPIC"]
+          SHOP = "https://naysbaits.com/products/new-script-patch-cap"
+          API = "https://naysbaits.com/products/new-script-patch-cap.js"
+
+          req = urllib.request.Request(API, headers={"User-Agent": "Mozilla/5.0"})
+          data = json.load(urllib.request.urlopen(req, timeout=20))
+          available = bool(data.get("available")) or any(
+              v.get("available") for v in data.get("variants", []))
+          print("VERFUEGBAR" if available else "ausverkauft")
+
+          text = ("TEST: JETZT VERFÜGBAR! Tippen zum Kaufen." if available
+                  else "TEST: Testprodukt ist gerade ausverkauft – anderes nehmen.")
+          req = urllib.request.Request(
+              f"https://ntfy.sh/{TOPIC}", data=text.encode("utf-8"), method="POST",
+              headers={"Title": "Nays Adventskalender", "Priority": "urgent",
+                       "Tags": "rotating_light", "Click": SHOP})
+          urllib.request.urlopen(req, timeout=20).read()
+          EOF
