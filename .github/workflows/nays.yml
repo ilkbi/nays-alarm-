@@ -45,6 +45,6 @@ jobs:
               push("JETZT VERFÜGBAR! Tippen zum Kaufen.", "urgent", "rotating_light")
           elif os.environ.get("EVENT") == "workflow_dispatch":
               push("Test erfolgreich: Bot läuft. Noch ausverkauft.", "default", "white_check_mark")
-          elif now.hour == 8 and now.minute < 5:  # ca. 9:00 Uhr deutscher Zeit
-              push("Bot läuft – Kalender noch ausverkauft.", "default", "hourglass")
-          EOF
+          
+          elif now.minute < 5:  # jede volle Stunde
+              push("Bot läuft – Kalender noch ausverkauft.", "low", "hourglass")
